@@ -42,6 +42,10 @@ smart-budget/
 
 Contributions are separate from transactions, so saving is never double counted.
 
+## Queries
+
+Read-only ORM queries live in `backend/core/queries.py` (details in `docs/ORM_QUERIES.md`). `python manage.py test core` runs the tests; `python manage.py demo_queries` loads fictional data and prints every result.
+
 ## Decisions I made (ERD marked them "decision required")
 
 UUID primary keys · email login · single currency ZMW · default categories shared system-wide · budget periods weekly/monthly/custom with no overlap · archive rather than delete for categories/goals. Change them in `backend/core/models.py` and regenerate migrations if the team decides differently.
