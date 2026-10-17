@@ -140,3 +140,23 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --------------------------------------------------------------------------- #
+# API and authentication settings (backend & auth sub-team)
+# --------------------------------------------------------------------------- #
+REST_FRAMEWORK["EXCEPTION_HANDLER"] = "core.api_errors.api_exception_handler"
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+    "login": "10/min",      # slows brute-force password guessing
+    "register": "10/hour",
+}
+
+# The React app runs on another port, so the browser must be allowed to send cookies to us.
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
+
+# Cookie hardening (OWASP): HttpOnly session cookie, SameSite, and HTTPS-only outside development.
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
