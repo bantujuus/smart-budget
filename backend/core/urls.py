@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import finance_views, planning_views, views
+from . import analytics_views, finance_views, planning_views, views
 
 urlpatterns = [
     # authentication
@@ -25,4 +25,8 @@ urlpatterns = [
          name="contribution-list"),
     path("goals/<str:pk>/contributions/<str:contribution_id>/",
          planning_views.ContributionDetailView.as_view(), name="contribution-detail"),
+    # dashboard, reports, insights
+    path("dashboard/", analytics_views.DashboardView.as_view(), name="dashboard"),
+    path("reports/summary/", analytics_views.ReportSummaryView.as_view(), name="report-summary"),
+    path("insights/", analytics_views.InsightsView.as_view(), name="insights"),
 ]

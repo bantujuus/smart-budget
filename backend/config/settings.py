@@ -145,6 +145,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # API and authentication settings (backend & auth sub-team)
 # --------------------------------------------------------------------------- #
 REST_FRAMEWORK["EXCEPTION_HANDLER"] = "core.api_errors.api_exception_handler"
+REST_FRAMEWORK["EXCEPTION_HANDLER"] = "core.api_errors.api_exception_handler"
+REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"] = ["core.renderers.MoneySafeJSONRenderer"]  # money is always a string
 REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
     "login": "10/min",      # slows brute-force password guessing
     "register": "10/hour",
