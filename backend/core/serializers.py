@@ -4,16 +4,21 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .models import User
+from .permissions import role_of
 
 
 class UserSerializer(serializers.ModelSerializer):
     """What the API shows about a user. Never includes the password."""
 
+    role = serializers.SerializerMethodField()  # "user" or "admin" (the frontend shows/hides admin pages)
+
     class Meta:
         model = User
-        fields = ["id", "email", "full_name", "currency", "created_at"]
+        fields = ["id", "email", "full_name", "currency", "role", "created_at"]
         read_only_fields = fields
 
+    def get_role(self, obj):
+        return role_of(obj)
 
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=254)

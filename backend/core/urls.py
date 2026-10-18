@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import analytics_views, finance_views, planning_views, views
+from . import admin_views, analytics_views, finance_views, planning_views, views
 
 urlpatterns = [
     # authentication
@@ -29,4 +29,10 @@ urlpatterns = [
     path("dashboard/", analytics_views.DashboardView.as_view(), name="dashboard"),
     path("reports/summary/", analytics_views.ReportSummaryView.as_view(), name="report-summary"),
     path("insights/", analytics_views.InsightsView.as_view(), name="insights"),
+    # administrator (role: admin)
+    path("admin/stats/", admin_views.AdminStatsView.as_view(), name="admin-stats"),
+    path("admin/users/", admin_views.AdminUserListView.as_view(), name="admin-user-list"),
+    path("admin/users/<str:pk>/", admin_views.AdminUserDetailView.as_view(), name="admin-user-detail"),
+    path("admin/categories/", admin_views.AdminCategoryListCreateView.as_view(), name="admin-category-list"),
+    path("admin/categories/<str:pk>/", admin_views.AdminCategoryDetailView.as_view(), name="admin-category-detail"),
 ]
