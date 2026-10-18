@@ -171,3 +171,38 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "loggers": {"smartbudget.audit": {"handlers": ["console"], "level": "INFO"}},
 }
+
+
+# --------------------------------------------------------------------------- #
+# OpenAPI 3.1 specification and interactive docs (drf-spectacular)
+# --------------------------------------------------------------------------- #
+INSTALLED_APPS += ["drf_spectacular", "drf_spectacular_sidecar"]  # sidecar = Swagger UI files served locally
+REST_FRAMEWORK["DEFAULT_SCHEMA_CLASS"] = "drf_spectacular.openapi.AutoSchema"
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Smart Budgeting and Financial Goal Management API",
+    "DESCRIPTION": (
+        "REST API for SmartBudget: accounts, income and expense tracking, budgets, savings goals, "
+        "dashboard, reports and rule-based insights.\n\n"
+        "**Authentication.** Session cookie. Call `GET /auth/csrf/` first, then send the `csrftoken` "
+        "cookie value in an `X-CSRFToken` header on every POST, PATCH and DELETE.\n\n"
+        "**Money** is always a decimal string such as `\"125.50\"`, never a floating-point number.\n\n"
+        "**Errors** always look like `{\"error\": {\"code\": ..., \"message\": ..., \"fields\": {...}}}`.\n\n"
+        "**Ownership.** Every endpoint only ever reads or changes the signed-in user's own records."
+    ),
+    "VERSION": "1.0.0",
+    "OAS_VERSION": "3.1.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SCHEMA_PATH_PREFIX": "/api/v1",
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
+    "SWAGGER_UI_SETTINGS": {"persistAuthorization": True},
+    "POSTPROCESSING_HOOKS": ["core.openapi_hooks.add_csrf_header"],
+    "TAGS": [
+        {"name": "Authentication", "description": "Register, sign in, sign out."},
+        {"name": "Categories"}, {"name": "Transactions"}, {"name": "Budgets"},
+        {"name": "Savings goals"}, {"name": "Dashboard and reports"},
+        {"name": "Administrator", "description": "Requires the admin role."},
+    ],
+}

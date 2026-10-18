@@ -1,5 +1,7 @@
 from django.urls import path
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+from . import api_docs  # noqa: F401  (describes the endpoints for OpenAPI)
 from . import admin_views, analytics_views, finance_views, planning_views, views
 
 urlpatterns = [
@@ -35,4 +37,7 @@ urlpatterns = [
     path("admin/users/<str:pk>/", admin_views.AdminUserDetailView.as_view(), name="admin-user-detail"),
     path("admin/categories/", admin_views.AdminCategoryListCreateView.as_view(), name="admin-category-list"),
     path("admin/categories/<str:pk>/", admin_views.AdminCategoryDetailView.as_view(), name="admin-category-detail"),
+    # OpenAPI 3.1 specification and interactive documentation
+    path("schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
 ]

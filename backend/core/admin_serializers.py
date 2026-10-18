@@ -26,7 +26,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
         fields = ["id", "email", "full_name", "role", "is_active", "created_at", "last_login"]
         read_only_fields = fields
 
-    def get_role(self, obj):
+    def get_role(self, obj) -> str:
         return role_of(obj)
 
 

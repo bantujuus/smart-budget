@@ -3,3 +3,5 @@ djangorestframework
 psycopg[binary]
 django-cors-headers
 python-dotenv
+drf-spectacular[sidecar]
+openapi-spec-validator

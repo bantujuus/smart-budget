@@ -19,7 +19,7 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ["id", "name", "kind", "is_system"]
         read_only_fields = fields
 
-    def get_is_system(self, obj):
+    def get_is_system(self, obj) -> bool:
         return obj.user_id is None  # system default categories belong to nobody
 
 

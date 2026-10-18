@@ -1,0 +1,2393 @@
+openapi: 3.1.0
+info:
+  title: Smart Budgeting and Financial Goal Management API
+  version: 1.0.0
+  description: |-
+    REST API for SmartBudget: accounts, income and expense tracking, budgets, savings goals, dashboard, reports and rule-based insights.
+
+    **Authentication.** Session cookie. Call `GET /auth/csrf/` first, then send the `csrftoken` cookie value in an `X-CSRFToken` header on every POST, PATCH and DELETE.
+
+    **Money** is always a decimal string such as `"125.50"`, never a floating-point number.
+
+    **Errors** always look like `{"error": {"code": ..., "message": ..., "fields": {...}}}`.
+
+    **Ownership.** Every endpoint only ever reads or changes the signed-in user's own records.
+paths:
+  /api/v1/admin/categories/:
+    get:
+      operationId: admin_categories_list
+      description: GET/POST /admin/categories/ - the default categories every user
+        sees.
+      summary: List default categories
+      tags:
+      - Administrator
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminCategory'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+    post:
+      operationId: admin_categories_create
+      description: GET/POST /admin/categories/ - the default categories every user
+        sees.
+      summary: Create a default category
+      tags:
+      - Administrator
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CategoryInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CategoryInputRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCategory'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with an existing record or a business rule.
+      parameters:
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+  /api/v1/admin/categories/{id}/:
+    delete:
+      operationId: admin_categories_destroy
+      description: DELETE /admin/categories/{id}/ - archive a default category.
+      summary: Archive a default category
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Category id (UUID).
+        required: true
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+      tags:
+      - Administrator
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+  /api/v1/admin/stats/:
+    get:
+      operationId: admin_stats_retrieve
+      description: Counts only. Never amounts or personal details.
+      summary: System statistics
+      tags:
+      - Administrator
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStats'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+  /api/v1/admin/users/:
+    get:
+      operationId: admin_users_retrieve
+      description: GET /admin/users/?q=&is_active= - accounts (paginated).
+      summary: List accounts
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - in: query
+        name: limit
+        schema:
+          type: integer
+        description: Page size (default 50, maximum 200).
+      - in: query
+        name: offset
+        schema:
+          type: integer
+        description: How many records to skip.
+      - in: query
+        name: q
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+      tags:
+      - Administrator
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedAdminUsers'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+  /api/v1/admin/users/{id}/:
+    patch:
+      operationId: admin_users_partial_update
+      description: A deactivated user cannot sign in and loses any open session. Admins
+        cannot deactivate themselves.
+      summary: Activate or deactivate an account
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: User id (UUID).
+        required: true
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+      tags:
+      - Administrator
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminUserUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminUserUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminUserUpdateRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+  /api/v1/auth/csrf/:
+    get:
+      operationId: auth_csrf_retrieve
+      description: GET /auth/csrf/ - the frontend calls this first so the browser
+        gets a CSRF cookie.
+      summary: Get a CSRF cookie
+      tags:
+      - Authentication
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CsrfOk'
+          description: ''
+  /api/v1/auth/login/:
+    post:
+      operationId: auth_login_create
+      description: Starts a session. A wrong email and a wrong password give the same
+        message.
+      summary: Sign in
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Too many attempts. Try again later.
+      parameters:
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+  /api/v1/auth/logout/:
+    post:
+      operationId: auth_logout_create
+      description: POST /auth/logout/ - end the session (CSRF is enforced by DRF for
+        signed-in users).
+      summary: Sign out
+      tags:
+      - Authentication
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+      parameters:
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+  /api/v1/auth/register/:
+    post:
+      operationId: auth_register_create
+      description: POST /auth/register/ - create an account and sign the user in.
+      summary: Create an account and sign in
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Too many attempts. Try again later.
+      parameters:
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+  /api/v1/budgets/:
+    get:
+      operationId: budgets_list
+      description: Each budget includes `used`, `remaining`, `used_pct` and `is_over`.
+      summary: List budgets with usage
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+      tags:
+      - Budgets
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Budget'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+    post:
+      operationId: budgets_create
+      description: One budget per category cannot overlap in time.
+      summary: Create a budget
+      tags:
+      - Budgets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BudgetInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BudgetInputRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Budget'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with an existing record or a business rule.
+      parameters:
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+  /api/v1/budgets/{id}/:
+    patch:
+      operationId: budgets_partial_update
+      summary: Edit a budget
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Budget id (UUID).
+        required: true
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+      tags:
+      - Budgets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBudgetUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBudgetUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBudgetUpdateRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Budget'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with an existing record or a business rule.
+    delete:
+      operationId: budgets_destroy
+      summary: Delete a budget
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Budget id (UUID).
+        required: true
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+      tags:
+      - Budgets
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+  /api/v1/categories/:
+    get:
+      operationId: categories_list
+      description: Default categories plus the user's own (archived ones are hidden).
+      summary: List categories
+      parameters:
+      - in: query
+        name: kind
+        schema:
+          type: string
+          enum:
+          - expense
+          - income
+        description: Only categories usable for this kind.
+      tags:
+      - Categories
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+    post:
+      operationId: categories_create
+      summary: Create a category
+      tags:
+      - Categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CategoryInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CategoryInputRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with an existing record or a business rule.
+      parameters:
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+  /api/v1/categories/{id}/:
+    delete:
+      operationId: categories_destroy
+      description: Hides it from new records; old transactions keep it.
+      summary: Archive a category
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Category id (UUID).
+        required: true
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+      tags:
+      - Categories
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+  /api/v1/dashboard/:
+    get:
+      operationId: dashboard_retrieve
+      description: Defaults to the current month when no dates are sent.
+      summary: Dashboard
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+      tags:
+      - Dashboard and reports
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+  /api/v1/goals/:
+    get:
+      operationId: goals_list
+      summary: List savings goals with progress
+      parameters:
+      - in: query
+        name: status
+        schema:
+          enum:
+          - active
+          - paused
+          - completed
+          - archived
+          type: string
+          x-spec-enum-id: 6d61a9d98e292a15
+          minLength: 1
+        description: |-
+          * `active` - active
+          * `paused` - paused
+          * `completed` - completed
+          * `archived` - archived
+      tags:
+      - Savings goals
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Goal'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+    post:
+      operationId: goals_create
+      summary: Create a savings goal
+      tags:
+      - Savings goals
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoalInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GoalInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GoalInputRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+      parameters:
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+  /api/v1/goals/{id}/:
+    get:
+      operationId: goals_retrieve
+      summary: Get one goal
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Goal id (UUID).
+        required: true
+      tags:
+      - Savings goals
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+    patch:
+      operationId: goals_partial_update
+      description: Pause, resume, complete or archive. Not every change is allowed
+        (409).
+      summary: Change a goal's status
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Goal id (UUID).
+        required: true
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+      tags:
+      - Savings goals
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedGoalStatusRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedGoalStatusRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedGoalStatusRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with an existing record or a business rule.
+  /api/v1/goals/{id}/contributions/:
+    get:
+      operationId: goals_contributions_list
+      summary: List a goal's contributions
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Goal id (UUID).
+        required: true
+      tags:
+      - Savings goals
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Contribution'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+    post:
+      operationId: goals_contributions_create
+      description: Completes the goal automatically when the target is reached.
+      summary: Add money to a goal
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Goal id (UUID).
+        required: true
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+      tags:
+      - Savings goals
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContributionInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ContributionInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ContributionInputRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContributionResult'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflicts with an existing record or a business rule.
+  /api/v1/goals/{id}/contributions/{contribution_id}/:
+    delete:
+      operationId: goals_contributions_destroy
+      summary: Remove a contribution
+      parameters:
+      - in: path
+        name: contribution_id
+        schema:
+          type: string
+        description: Contribution id (UUID).
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Goal id (UUID).
+        required: true
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+      tags:
+      - Savings goals
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+  /api/v1/insights/:
+    get:
+      operationId: insights_retrieve
+      description: Explainable rule-based tips, most important first. Not financial
+        advice.
+      summary: Smart insights
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+      tags:
+      - Dashboard and reports
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightsResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+  /api/v1/me/:
+    get:
+      operationId: me_retrieve
+      description: The signed-in user, including their role (`user` or `admin`).
+      summary: Who am I?
+      tags:
+      - Authentication
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+  /api/v1/reports/summary/:
+    get:
+      operationId: reports_summary_retrieve
+      description: GET /reports/summary/ - totals, spending by category and the trend
+        over time.
+      summary: Report summary
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: granularity
+        schema:
+          enum:
+          - day
+          - week
+          - month
+          type: string
+          x-spec-enum-id: 273287207128dc4a
+          default: month
+          minLength: 1
+        description: |-
+          * `day` - day
+          * `week` - week
+          * `month` - month
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+      tags:
+      - Dashboard and reports
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportSummaryResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+  /api/v1/transactions/:
+    get:
+      operationId: transactions_list
+      summary: List transactions
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: limit
+        schema:
+          type: integer
+        description: Page size (default 50, maximum 200).
+      - in: query
+        name: offset
+        schema:
+          type: integer
+        description: How many records to skip.
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: type
+        schema:
+          enum:
+          - income
+          - expense
+          type: string
+          x-spec-enum-id: 00fd587478d7c70f
+          minLength: 1
+        description: |-
+          * `income` - income
+          * `expense` - expense
+      tags:
+      - Transactions
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedTransactions'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+    post:
+      operationId: transactions_create
+      summary: Record a transaction
+      tags:
+      - Transactions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TransactionInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TransactionInputRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+      parameters:
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+  /api/v1/transactions/{id}/:
+    get:
+      operationId: transactions_retrieve
+      summary: Get one transaction
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Transaction id (UUID).
+        required: true
+      tags:
+      - Transactions
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+    patch:
+      operationId: transactions_partial_update
+      description: Send only the fields to change.
+      summary: Edit a transaction
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Transaction id (UUID).
+        required: true
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+      tags:
+      - Transactions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTransactionInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTransactionInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTransactionInputRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed. See `error.fields`.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+    delete:
+      operationId: transactions_destroy
+      summary: Delete a transaction
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Transaction id (UUID).
+        required: true
+      - name: X-CSRFToken
+        in: header
+        required: true
+        description: Value of the `csrftoken` cookie (get it from `GET /auth/csrf/`).
+        schema:
+          type: string
+      tags:
+      - Transactions
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not signed in, missing or wrong CSRF token, or not allowed
+            (wrong role).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not found. Other users' records also return 404, so ids cannot
+            be probed.
+components:
+  schemas:
+    AdminCategory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        kind:
+          enum:
+          - income
+          - expense
+          - both
+          type: string
+          description: |-
+            * `income` - Income
+            * `expense` - Expense
+            * `both` - Both
+          x-spec-enum-id: 7ab3ff021e0a44e8
+          readOnly: true
+        is_archived:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - is_archived
+      - kind
+      - name
+    AdminUser:
+      type: object
+      description: Account details an administrator may see. No password, and no financial
+        data.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        full_name:
+          type: string
+          readOnly: true
+        role:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        last_login:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - email
+      - full_name
+      - id
+      - is_active
+      - last_login
+      - role
+    Budget:
+      type: object
+      description: Works with the objects from queries.budgets_with_usage (they carry
+        the extra fields).
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        category:
+          allOf:
+          - $ref: '#/components/schemas/Category'
+          readOnly: true
+        period_type:
+          enum:
+          - weekly
+          - monthly
+          - custom
+          type: string
+          description: |-
+            * `weekly` - Weekly
+            * `monthly` - Monthly
+            * `custom` - Custom
+          x-spec-enum-id: 0797ab38ffaff5be
+          readOnly: true
+        start_date:
+          type: string
+          format: date
+          readOnly: true
+        end_date:
+          type: string
+          format: date
+          readOnly: true
+        limit_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        used:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        remaining:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        used_pct:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          readOnly: true
+        is_over:
+          type: boolean
+          readOnly: true
+      required:
+      - category
+      - end_date
+      - id
+      - is_over
+      - limit_amount
+      - period_type
+      - remaining
+      - start_date
+      - used
+      - used_pct
+    BudgetInputRequest:
+      type: object
+      properties:
+        category_id:
+          type: string
+          minLength: 1
+        period_type:
+          type: string
+          minLength: 1
+        start_date:
+          type: string
+          minLength: 1
+        end_date:
+          type: string
+          minLength: 1
+        limit_amount: {}
+      required:
+      - category_id
+      - end_date
+      - limit_amount
+      - period_type
+      - start_date
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        kind:
+          enum:
+          - income
+          - expense
+          - both
+          type: string
+          description: |-
+            * `income` - Income
+            * `expense` - Expense
+            * `both` - Both
+          x-spec-enum-id: 7ab3ff021e0a44e8
+          readOnly: true
+        is_system:
+          type: boolean
+          readOnly: true
+      required:
+      - id
+      - is_system
+      - kind
+      - name
+    CategoryCounts:
+      type: object
+      properties:
+        default:
+          type: integer
+        custom:
+          type: integer
+      required:
+      - custom
+      - default
+    CategoryInputRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        kind:
+          type: string
+          minLength: 1
+      required:
+      - kind
+      - name
+    CategoryTotal:
+      type: object
+      properties:
+        category_id:
+          type: string
+          format: uuid
+        category:
+          type: string
+        total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        share_pct:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,1})?$
+      required:
+      - category
+      - category_id
+      - share_pct
+      - total
+    Contribution:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        contribution_date:
+          type: string
+          format: date
+          readOnly: true
+        note:
+          type:
+          - string
+          - 'null'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - amount
+      - contribution_date
+      - created_at
+      - id
+      - note
+    ContributionInputRequest:
+      type: object
+      properties:
+        amount: {}
+        contribution_date:
+          type: string
+          minLength: 1
+        note:
+          type:
+          - string
+          - 'null'
+      required:
+      - amount
+      - contribution_date
+    ContributionResult:
+      type: object
+      properties:
+        contribution:
+          $ref: '#/components/schemas/Contribution'
+        goal:
+          $ref: '#/components/schemas/Goal'
+      required:
+      - contribution
+      - goal
+    CsrfOk:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    DashboardResponse:
+      type: object
+      properties:
+        period:
+          $ref: '#/components/schemas/Period'
+        totals:
+          $ref: '#/components/schemas/Totals'
+        currency:
+          type: string
+        budgets:
+          type: array
+          items:
+            $ref: '#/components/schemas/Budget'
+        goals:
+          type: array
+          items:
+            $ref: '#/components/schemas/Goal'
+        recent_transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+      required:
+      - budgets
+      - currency
+      - goals
+      - period
+      - recent_transactions
+      - totals
+    ErrorBody:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Machine-readable code, e.g. VALIDATION_ERROR, NOT_FOUND, CONFLICT.
+        message:
+          type: string
+        fields:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Per-field messages (validation errors only).
+      required:
+      - code
+      - message
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+      required:
+      - error
+    Goal:
+      type: object
+      description: Works with the objects from queries.goals_with_progress.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        target_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        target_date:
+          type:
+          - string
+          - 'null'
+          format: date
+          readOnly: true
+        status:
+          enum:
+          - active
+          - paused
+          - completed
+          - archived
+          type: string
+          description: |-
+            * `active` - Active
+            * `paused` - Paused
+            * `completed` - Completed
+            * `archived` - Archived
+          x-spec-enum-id: f842f116598c5808
+          readOnly: true
+        contributed:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        progress_pct:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          readOnly: true
+        bar_pct:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          readOnly: true
+        remaining_to_target:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - bar_pct
+      - contributed
+      - created_at
+      - id
+      - name
+      - progress_pct
+      - remaining_to_target
+      - status
+      - target_amount
+      - target_date
+    GoalInputRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        target_amount: {}
+        target_date:
+          type:
+          - string
+          - 'null'
+        initial_contribution:
+          oneOf:
+          - {}
+          - type: 'null'
+      required:
+      - name
+      - target_amount
+    GoalStatusCounts:
+      type: object
+      properties:
+        active:
+          type: integer
+        paused:
+          type: integer
+        completed:
+          type: integer
+        archived:
+          type: integer
+      required:
+      - active
+      - archived
+      - completed
+      - paused
+    Insight:
+      type: object
+      properties:
+        period:
+          $ref: '#/components/schemas/Period'
+        rule:
+          type: string
+          description: Which rule fired, e.g. BUDGET_OVER.
+        severity:
+          enum:
+          - warning
+          - info
+          - positive
+          type: string
+          description: |-
+            * `warning` - warning
+            * `info` - info
+            * `positive` - positive
+          x-spec-enum-id: 6045728fb220bcbf
+        title:
+          type: string
+        message:
+          type: string
+        explanation:
+          type: string
+          description: Why this tip was shown (the rule and its threshold).
+        data:
+          type: object
+          additionalProperties: {}
+          description: The numbers behind the tip.
+      required:
+      - data
+      - explanation
+      - message
+      - period
+      - rule
+      - severity
+      - title
+    InsightsResponse:
+      type: object
+      properties:
+        period:
+          $ref: '#/components/schemas/Period'
+        insights:
+          type: array
+          items:
+            $ref: '#/components/schemas/Insight'
+        message:
+          type: string
+        disclaimer:
+          type: string
+      required:
+      - disclaimer
+      - insights
+      - message
+      - period
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - email
+      - password
+    PagedAdminUsers:
+      type: object
+      properties:
+        count:
+          type: integer
+        next:
+          type:
+          - string
+          - 'null'
+          format: uri
+        previous:
+          type:
+          - string
+          - 'null'
+          format: uri
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUser'
+      required:
+      - count
+      - next
+      - previous
+      - results
+    PagedTransactions:
+      type: object
+      properties:
+        count:
+          type: integer
+        next:
+          type:
+          - string
+          - 'null'
+          format: uri
+        previous:
+          type:
+          - string
+          - 'null'
+          format: uri
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+      required:
+      - count
+      - next
+      - previous
+      - results
+    PatchedAdminUserUpdateRequest:
+      type: object
+      properties:
+        is_active:
+          type: boolean
+    PatchedBudgetUpdateRequest:
+      type: object
+      properties:
+        period_type:
+          type: string
+          minLength: 1
+        start_date:
+          type: string
+          minLength: 1
+        end_date:
+          type: string
+          minLength: 1
+        limit_amount: {}
+    PatchedGoalStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          minLength: 1
+    PatchedTransactionInputRequest:
+      type: object
+      description: 'Used for POST (all fields required) and PATCH (partial=True: only
+        what was sent).'
+      properties:
+        category_id:
+          type: string
+          minLength: 1
+        type:
+          type: string
+          minLength: 1
+        amount: {}
+        transaction_date:
+          type: string
+          minLength: 1
+        note:
+          type:
+          - string
+          - 'null'
+    Period:
+      type: object
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+      required:
+      - end_date
+      - start_date
+    RecordCounts:
+      type: object
+      properties:
+        transactions:
+          type: integer
+        budgets:
+          type: integer
+        goal_contributions:
+          type: integer
+      required:
+      - budgets
+      - goal_contributions
+      - transactions
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          maxLength: 128
+        full_name:
+          type: string
+          default: ''
+          maxLength: 150
+      required:
+      - email
+      - password
+    ReportSummaryResponse:
+      type: object
+      properties:
+        period:
+          $ref: '#/components/schemas/Period'
+        totals:
+          $ref: '#/components/schemas/Totals'
+        currency:
+          type: string
+        granularity:
+          type: string
+        expense_by_category:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryTotal'
+        income_by_category:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryTotal'
+        trend:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrendPoint'
+      required:
+      - currency
+      - expense_by_category
+      - granularity
+      - income_by_category
+      - period
+      - totals
+      - trend
+    SystemStats:
+      type: object
+      properties:
+        users:
+          $ref: '#/components/schemas/UserCounts'
+        records:
+          $ref: '#/components/schemas/RecordCounts'
+        goals_by_status:
+          $ref: '#/components/schemas/GoalStatusCounts'
+        categories:
+          $ref: '#/components/schemas/CategoryCounts'
+        generated_at:
+          type: string
+          format: date-time
+      required:
+      - categories
+      - generated_at
+      - goals_by_status
+      - records
+      - users
+    Totals:
+      type: object
+      properties:
+        income_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        expense_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        net_cash_flow:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+      required:
+      - expense_total
+      - income_total
+      - net_cash_flow
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        type:
+          enum:
+          - income
+          - expense
+          type: string
+          description: |-
+            * `income` - Income
+            * `expense` - Expense
+          x-spec-enum-id: 0051e97082791f1b
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        transaction_date:
+          type: string
+          format: date
+          readOnly: true
+        note:
+          type:
+          - string
+          - 'null'
+          readOnly: true
+        category:
+          allOf:
+          - $ref: '#/components/schemas/Category'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - amount
+      - category
+      - created_at
+      - id
+      - note
+      - transaction_date
+      - type
+    TransactionInputRequest:
+      type: object
+      description: 'Used for POST (all fields required) and PATCH (partial=True: only
+        what was sent).'
+      properties:
+        category_id:
+          type: string
+          minLength: 1
+        type:
+          type: string
+          minLength: 1
+        amount: {}
+        transaction_date:
+          type: string
+          minLength: 1
+        note:
+          type:
+          - string
+          - 'null'
+      required:
+      - amount
+      - category_id
+      - transaction_date
+      - type
+    TrendPoint:
+      type: object
+      properties:
+        period:
+          type: string
+          format: date
+          description: First day of the day/week/month.
+        income:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        expense:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        net:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+      required:
+      - expense
+      - income
+      - net
+      - period
+    User:
+      type: object
+      description: What the API shows about a user. Never includes the password.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        full_name:
+          type: string
+          readOnly: true
+        currency:
+          type: string
+          readOnly: true
+        role:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - currency
+      - email
+      - full_name
+      - id
+      - role
+    UserCounts:
+      type: object
+      properties:
+        total:
+          type: integer
+        active:
+          type: integer
+        admins:
+          type: integer
+        new_last_30_days:
+          type: integer
+      required:
+      - active
+      - admins
+      - new_last_30_days
+      - total
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+tags:
+- name: Authentication
+  description: Register, sign in, sign out.
+- name: Categories
+- name: Transactions
+- name: Budgets
+- name: Savings goals
+- name: Dashboard and reports
+- name: Administrator
+  description: Requires the admin role.
