@@ -1,59 +1,148 @@
-# Smart Budgeting and Financial Goal Management System
+# 🚀 SmartBudget
 
-Stack (per docs/03 ERD, pending team confirmation): React + TypeScript, Django REST Framework, PostgreSQL.
+SmartBudget is a modern, full-stack financial management and budgeting application designed to help users track income, monitor expenses, and manage financial goals with ease.
 
-```
+## 🛠️ Tech Stack
+
+- **Frontend:** React, TypeScript, Vite, Tailwind CSS, Lucide Icons, Axios
+- **Backend:** Django, Django REST Framework (DRF), PostgreSQL
+- **Database / Infrastructure:** Docker & PostgreSQL (Port `5433`)
+
+---
+
+## 📂 Project Structure
+
+```text
 smart-budget/
-├── backend/    Django project (config/) + app (core/) with models and migrations
-├── frontend/   React app goes here
-├── db/         create_database.sql, schema.sql (reference), seed_categories.sql, verify_constraints.py
-├── docs/       the 9 PDF documents from the documentation pack
-├── .env.example
+├── backend/            # Django REST Framework API
+│   ├── config/         # Django settings & URLs
+│   ├── core/           # Custom User model, views & auth
+│   └── manage.py       # Django management script
+├── frontend/           # React + Vite + Tailwind client
+│   ├── src/
+│   │   ├── api/        # Axios API service modules
+│   │   ├── components/ # Reusable UI components
+│   │   ├── views/      # Dashboard, Transactions, Budgets
+│   │   └── App.tsx     # Main router & layout
+│   └── package.json
+└── docker-compose.yml  # PostgreSQL database container configuration
+
 ```
 
-## Setup
+---
 
-1. Install Python 3.11+ and PostgreSQL 14+.
-2. Create the database (edit the password first): `psql -U postgres -f db/create_database.sql`
-3. `cp .env.example .env` and set `DB_PASSWORD` (and a real `DJANGO_SECRET_KEY`).
-4. ```
-   cd backend
-   python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
-   pip install -r requirements.txt
-   python manage.py migrate
-   python manage.py seed_defaults
-   python manage.py createsuperuser
-   python manage.py runserver
-   ```
-5. Optional check that the database enforces its rules: `python db/verify_constraints.py` (uses and then deletes its own test rows).
+## ⚙️ Getting Started
 
-**Migrations are the source of truth.** `db/schema.sql` is a reference dump; do not apply both.
+### Prerequisites
 
-## Tables
+Make sure you have the following installed on your system:
 
-| Table | Purpose | Key rules |
-|---|---|---|
-| users | accounts (email login) | unique email (case-insensitive), hashed password, currency default ZMW |
-| categories | income/expense labels | `user_id` NULL = system default; unique name per owner+kind; archived, not deleted |
-| transactions | income & expense records | amount > 0, DECIMAL(12,2), category PROTECTed |
-| budgets | category spending limit for a period | limit > 0, end >= start, **no overlapping periods** per user+category |
-| savings_goals | goals | target > 0, status active/paused/completed/archived |
-| goal_contributions | money put toward a goal | amount > 0, **owner must equal goal's owner** (composite FK) |
+* **Python** (v3.10+)
+* **Node.js** (v18+) & `npm`
+* **Docker** & **Docker Compose**
 
-Contributions are separate from transactions, so saving is never double counted.
+---
 
-## Queries
+### 1. Database Setup (Docker)
 
-Read-only ORM queries live in `backend/core/queries.py` (details in `docs/ORM_QUERIES.md`). `python manage.py test core` runs the tests; `python manage.py demo_queries` loads fictional data and prints every result.
+Start the PostgreSQL database container in the background:
 
-## Writes and transactions
+```bash
+docker compose up -d
 
-All writes go through `backend/core/services.py` (atomic blocks, row locking, ownership checks; details in `docs/TRANSACTIONS.md`). Run everything with `python manage.py test core` (58 tests, about 50 seconds because the concurrency tests open several database connections).
+```
 
-## Decisions I made (ERD marked them "decision required")
+* **Database Name:** `smart_budget`
+* **User:** `postgres`
+* **Password:** `postgrespassword`
+* **Port Mapping:** `5433` (Host) -> `5432` (Container)
 
-UUID primary keys · email login · single currency ZMW · default categories shared system-wide · budget periods weekly/monthly/custom with no overlap · archive rather than delete for categories/goals. Change them in `backend/core/models.py` and regenerate migrations if the team decides differently.
+---
 
-## Not enforced by the database
+### 2. Backend Setup (Django)
 
-"Category kind must match transaction type" and "user can only use their own or system categories" are checked in model `clean()` (call it from the API serializers); they span tables, so a plain CHECK can't express them.
+1. Navigate to the backend directory and create/activate a virtual environment:
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+
+```
+
+
+2. Install Python dependencies:
+```bash
+pip install -r requirements.txt
+# Or install core packages if requirements.txt is pending:
+pip install django djangorestframework psycopg2-binary django-cors-headers
+
+```
+
+
+3. Run database migrations:
+```bash
+python3 manage.py makemigrations
+python3 manage.py migrate
+
+```
+
+
+4. Create a superuser (for admin access):
+```bash
+python3 manage.py createsuperuser
+
+```
+
+
+5. Start the Django development server:
+```bash
+python3 manage.py runserver
+
+```
+
+
+* The backend API will be available at **`http://127.0.0.1:8000/api/v1/`**
+
+
+
+---
+
+### 3. Frontend Setup (React + Vite)
+
+1. Open a new terminal window and navigate to the frontend directory:
+```bash
+cd frontend
+
+```
+
+
+2. Install dependencies:
+```bash
+npm install
+
+```
+
+
+3. Start the Vite development server:
+```bash
+npm run dev
+
+```
+
+
+* The frontend client will be available at **`http://localhost:5173`** (Vite proxies API requests to backend port `8000`).
+
+
+
+---
+
+## 🔑 API Endpoints Overview
+
+| Endpoint | Method | Description |
+| --- | --- | --- |
+| `/api/v1/auth/login/` | `POST` | Authenticate user & return Auth Token |
+| `/api/v1/auth/register/` | `POST` | Register a new user account |
+| `/api/v1/categories/` | `GET / POST` | List or create transaction categories |
+| `/api/v1/transactions/` | `GET / POST` | Manage user transactions |
+| `/api/v1/reports/summary/` | `GET` | Get dashboard cash flow totals |
+
